@@ -86,28 +86,47 @@
      (file-commits ?f ?c)]])
 
 ;; Find authors who has had part in the evolution of a function
-(q '[:find ?email
-     :in $ % ?name
-     :where
-     [?n :code/name ?name]
-     [?cq :clj/def ?n]
-     (codeq-commits ?cq ?commit)
-     [?commit :commit/author ?a]
-     [?a :email/address ?email]]
-   (codeq-db)
-   rules
-   "clojure.core.reducers/fold")
+(defn commit-dates [name]
+  (map first
+       (q '[:find (min ?date) ?sha
+            :in $ % ?name
+            :where
+            [?n :code/name ?name]
+            [?cq :clj/def ?n]
+            [?cq :codeq/code ?c]
+            [?c :code/sha ?sha]
+            (codeq-commits ?cq ?commit)
+            [?commit :commit/committedAt ?date]]
+          (codeq-db)
+          rules
+          name)))
+
+(defn committer-by-insts [insts]
+  (q '[:find ?email
+       :in $ [?inst ...]
+       :where
+       [?commit :commit/committedAt ?inst]
+       [?commit :commit/committer ?u]
+       [?u :email/address ?email]]
+     (codeq-db)
+     insts))
+
+(-> "clojure.core.reducers/fold" commit-dates committer-by-insts)
 
 ;; What function definition has been part of the most commits
-(->> (q '[:find ?name (count ?commit)
-          :in $ %
+(->> (q '[:find ?name (count ?date)
           :where
-          [?n :code/name ?name]
-          [?cq :clj/def ?n]
-          (codeq-commits ?cq ?commit)]
-        (codeq-db)
-        rules)
+          [_ :code/name ?name]
+          [(datomic.codeq.examples/commit-dates ?name) [?date ...]]]
+        (codeq-db))
      (sort-by second)
      reverse
      (take 5))
-     
+;; (["clojure.test-clojure/test-names" 19]
+;;  ["clojure.main/repl" 17]
+;;  ["clojure.core/defn" 14]
+;;  ["clojure.core/promise" 10]
+;;  ["clojure.core/future-call" 9])
+
+
+
