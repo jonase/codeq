@@ -4,66 +4,87 @@
             [datomic.codeq.util :as util]
             [datomic.codeq.analyzers.java.parser :refer [parse-tree]]))
 
-(defmulti emit-tx-data (fn [db ast fid src ctx] (:node ast)))
+(defmulti tx-data (fn [db fid ast ctx] (:node ast)))
 
-(defmethod emit-tx-data :compilation-unit [db ast fid src ctx]
+(defmethod tx-data :compilation-unit [db ast fid ctx]
   (let [package (-> ast :package :name)
         types (:types ast)]
-    (mapcat #(emit-tx-data db % fid src (assoc ctx :package package)) types)))
+    (mapcat #(tx-data db % fid (assoc ctx :package package)) types)))
 
-(defmethod emit-tx-data :type-declaration [db ast fid src ctx]
-  (let [codename->id (:codename->id ctx)
-        sha->id (:sha->id ctx)
-        codename (format "%s.%s" (:package ctx) (:name ast))
-        codeid (codename->id codename)
+(defmethod tx-data :type-declaration
+  [db fid
+   {:keys [sha name loc src interface?] :as ast}
+   {:keys [sha->id codename->id package] :as ctx}]
+  (let [codename (format "%s.%s" package ast)
+        codeid (sha->id sha)
+
         codetx (if (util/tempid? codeid)
                  {:db/id codeid
-                  :code/sha (:sha ast)
-                  :code/text (:src ast)})
+                  :code/sha sha
+                  :code/text src})
+
         codeqid (or (ffirst (d/q '[:find ?e :in $ ?f ?loc
                                    :where
                                    [?e :codeq/file ?f] 
                                    [?e :codeq/loc ?loc]]
                                  db fid loc))
                     (d/tempid :db.part/user))
+
         codeqtx (if (util/tempid? codeqid)
                   {:db/id codeqid
                    :codeq/file fid
                    :codeq/loc loc
-                   :codeq/code codeid})]))
+                   :codeq/code codeid}
+                  {:db/id codeqid})
 
-(defmethod emit-tx-data :enum-declaration [db ast fid src ctx]
+        nameid (codename->id codename)
+
+        nametx (if (util/tempid? nameid)
+                 {:db/id nameid
+                  :code/name codename})
+
+        codeqtx (assoc codeqtx
+                  (if interface? :java/interface :java/class)
+                  nameid)]
+    
+    (remove nil? [codetx codeqtx nametx])))
+
+(defmethod tx-data :enum-declaration [db fid ast ctx]
   (let [codename (format "ED %s.%s" (:package ctx) (:name ast))]
-    (println codeq-name)))
+    (println codename)))
 
-(defmethod emit-tx-data :annotation-type-declaration [db ast fid src ctx]
+(defmethod tx-data :annotation-type-declaration [db fid ast ctx]
   (let [codename (format "ATD %s.%s" (:package ctx) (:name ast))]
-    (println codeq-name)))
+    (println codename)))
 
 (defn analyze [db fid src]
   (let [ast (parse-tree src)]
-    (emit-tx-data db ast fid src {:sha->id (util/index->id-fn db :code/sha)
-                                  :codename->id (util/index->id-fn db :code/name)})))
+    (tx-data db fid ast {:sha->id (util/index->id-fn db :code/sha)
+                         :codename->id (util/index->id-fn db :code/name)})))
   
 (defn schemas []
   {1 [{:db/id #db/id[:db.part/db]
        :db/ident :java/class
-       :db/valueType :db.cardinality/one
+       :db/valueType :db.type/ref
+       :db/cardinality :db.cardinality/one
        :db/doc "codename defined by a class definition"
        :db.install/_attribute :db.part/db}
       {:db/id #db/id[:db.part/db]
        :db/ident :java.class/methods
-       :db/valueType :db.cardinality/many
+       :db/valueType :db.type/ref
+       :db/cardinality :db.cardinality/many
        :db/doc "The methods defined by a class"
-       :db.install/_attribute :db.part/db}]}
+       :db.install/_attribute :db.part/db}
       {:db/id #db/id[:db.part/db]
        :db/ident :java/interface
-       :db/valueType :db.cardinality/one
+       :db/valueType :db.type/ref
+       :db/cardinality :db.cardinality/one
        :db/doc "codename defined by an interface definition"
        :db.install/_attribute :db.part/db}
       {:db/id #db/id[:db.part/db]
        :db/ident :java.interface/methods
-       :db/valueType :db.cardinality/many
+       :db/valueType :db.type/ref
+       :db/cardinality :db.cardinality/many
        :db/doc "The methods defined in an interface"
        :db.install/_attribute :db.part/db}]})
 
