@@ -4,18 +4,23 @@
             [datomic.codeq.util :as util]
             [datomic.codeq.analyzers.java.parser :refer [parse-tree]]))
 
+(defmacro ? [expr]
+  `(let [e# ~expr]
+     (clojure.pprint/pprint e#)
+     e#))
+
 (defmulti tx-data (fn [db fid ast ctx] (:node ast)))
 
-(defmethod tx-data :compilation-unit [db ast fid ctx]
-  (let [package (-> ast :package :name)
+(defmethod tx-data :compilation-unit [db fid ast ctx]
+  (let [package (:package ast)
         types (:types ast)]
-    (mapcat #(tx-data db % fid (assoc ctx :package package)) types)))
+    (mapcat #(tx-data db fid % (assoc ctx :package package)) types)))
 
 (defmethod tx-data :type-declaration
   [db fid
    {:keys [sha name loc src interface?] :as ast}
    {:keys [sha->id codename->id package] :as ctx}]
-  (let [codename (format "%s.%s" package ast)
+  (let [codename (format "%s.%s" package name)
         codeid (sha->id sha)
 
         codetx (if (util/tempid? codeid)
@@ -33,7 +38,7 @@
         codeqtx (if (util/tempid? codeqid)
                   {:db/id codeqid
                    :codeq/file fid
-                   :codeq/loc loc
+                   :codeq/loc (apply pr-str loc)
                    :codeq/code codeid}
                   {:db/id codeqid})
 
@@ -97,3 +102,24 @@
   (analyze [a db fid src] (analyze db fid src)))
 
 (defn impl [] (JavaAnalyzer.))
+
+(comment
+  (def uri "datomic:free://localhost:4334/git")
+  (def conn (d/connect uri))
+  (def db (d/db conn))
+  
+  (clojure.pprint/pprint
+   (sort
+    (d/q '[:find ?fname ?n ; ?commit
+           :where
+           [?cq :java/class ?c]
+           [?c :code/name ?n]
+           [?cq :codeq/file ?f]
+           [?node :node/object ?f]
+           [?node :node/filename ?filename]
+           [?filename :file/name ?fname]]
+         db)))
+
+  (d/delete-database uri)
+
+  )
