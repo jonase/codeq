@@ -18,9 +18,10 @@
 
 (defmethod tx-data :type-declaration
   [db fid
-   {:keys [sha name loc src interface?] :as ast}
-   {:keys [sha->id codename->id package] :as ctx}]
-  (let [codename (format "%s.%s" package name)
+   {:keys [sha name loc src interface? methods] :as ast}
+   {:keys [sha->id codename->id loc->codeqid package] :as ctx}]
+  (let [loc-str (apply pr-str loc)
+        codename (format "%s.%s" package name)
         codeid (sha->id sha)
 
         codetx (if (util/tempid? codeid)
@@ -28,17 +29,12 @@
                   :code/sha sha
                   :code/text src})
 
-        codeqid (or (ffirst (d/q '[:find ?e :in $ ?f ?loc
-                                   :where
-                                   [?e :codeq/file ?f] 
-                                   [?e :codeq/loc ?loc]]
-                                 db fid loc))
-                    (d/tempid :db.part/user))
+        codeqid (loc->codeqid loc-str)
 
         codeqtx (if (util/tempid? codeqid)
                   {:db/id codeqid
                    :codeq/file fid
-                   :codeq/loc (apply pr-str loc)
+                   :codeq/loc loc-str
                    :codeq/code codeid}
                   {:db/id codeqid})
 
@@ -50,9 +46,11 @@
 
         codeqtx (assoc codeqtx
                   (if interface? :java/interface :java/class)
-                  nameid)]
+                  nameid)
+
+        methodtxs (mapcat #(tx-data db fid % (assoc ctx :typename codename :parent codeqid)) methods)]
     
-    (remove nil? [codetx codeqtx nametx])))
+    (remove nil? (concat [codetx codeqtx nametx] methodtxs))))
 
 (defmethod tx-data :enum-declaration [db fid ast ctx]
   (let [codename (format "ED %s.%s" (:package ctx) (:name ast))]
@@ -62,10 +60,49 @@
   (let [codename (format "ATD %s.%s" (:package ctx) (:name ast))]
     (println codename)))
 
+(defmethod tx-data :method-declaration
+  [db fid
+   {:keys [name parameters loc sha src] :as ast}
+   {:keys [sha->id codename->id loc->codeqid typename parent] :as ctx}]
+  (let [loc-str (apply pr-str loc)
+        codename (format "%s/%s/%s"
+                         typename
+                         name
+                         (count parameters))
+
+        codeid (sha->id sha)
+
+        codetx (when (util/tempid? codeid)
+                 {:db/id codeid
+                  :code/sha sha
+                  :code/text src})
+
+        codeqid (loc->codeqid loc)
+
+        codeqtx (if (util/tempid? codeqid)
+                  {:db/id codeqid
+                   :codeq/file fid
+                   :codeq/loc loc-str
+                   :codeq/code codeid
+                   :codeq/parent parent}
+                  {:db/id codeqid})
+        nameid (codename->id codename)
+        nametx (if (util/tempid? nameid)
+                 {:db/id nameid
+                  :code/name codename})
+        codeqtx (assoc codeqtx :java/method nameid)]
+    (remove nil? [codetx codeqtx nametx])))
+
 (defn analyze [db fid src]
   (let [ast (parse-tree src)]
     (tx-data db fid ast {:sha->id (util/index->id-fn db :code/sha)
-                         :codename->id (util/index->id-fn db :code/name)})))
+                         :codename->id (util/index->id-fn db :code/name)
+                         :loc->codeqid #(or (ffirst (d/q '[:find ?e :in $ ?f ?loc
+                                                           :where
+                                                           [?e :codeq/file ?f]
+                                                           [?e :codeq/loc ?loc]]
+                                                         db fid %))
+                                            (d/tempid :db.part/user))})))
   
 (defn schemas []
   {1 [{:db/id #db/id[:db.part/db]
@@ -75,23 +112,18 @@
        :db/doc "codename defined by a class definition"
        :db.install/_attribute :db.part/db}
       {:db/id #db/id[:db.part/db]
-       :db/ident :java.class/methods
-       :db/valueType :db.type/ref
-       :db/cardinality :db.cardinality/many
-       :db/doc "The methods defined by a class"
-       :db.install/_attribute :db.part/db}
-      {:db/id #db/id[:db.part/db]
        :db/ident :java/interface
        :db/valueType :db.type/ref
        :db/cardinality :db.cardinality/one
        :db/doc "codename defined by an interface definition"
        :db.install/_attribute :db.part/db}
       {:db/id #db/id[:db.part/db]
-       :db/ident :java.interface/methods
+       :db/ident :java/method
        :db/valueType :db.type/ref
-       :db/cardinality :db.cardinality/many
-       :db/doc "The methods defined in an interface"
+       :db/cardinality :db.cardinality/one
+       :db/doc "Java method"
        :db.install/_attribute :db.part/db}]})
+
 
 (deftype JavaAnalyzer []
   az/Analyzer

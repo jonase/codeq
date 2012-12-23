@@ -5,7 +5,7 @@
   (:import [org.eclipse.jdt.core.dom AST ASTParser
             CompilationUnit PackageDeclaration ImportDeclaration
             TypeDeclaration EnumDeclaration AnnotationTypeDeclaration
-            MethodDeclaration Statement Expression Type]
+            MethodDeclaration Statement Expression Type SingleVariableDeclaration]
            [org.eclipse.jdt.core JavaCore]))
 
 (defn java-parse-tree [s]
@@ -62,11 +62,18 @@
 
 (defmethod parse* MethodDeclaration [node]
   {:node :method-declaration
+   :name (name node)
    :body (parse (.getBody node))
    :parameters (map parse (.parameters node))
    :return-type (parse (.getReturnType2 node))
    :constructor? (.isConstructor node)
    :varargs? (.isVarargs node)})
+
+(defmethod parse* SingleVariableDeclaration [node]
+  {:node :variable-declaration
+   :name (name node)
+   :type (parse (.getType node))
+   })
 
 (defmethod parse* Statement [node]
   {:node :statement})
@@ -80,50 +87,20 @@
 (defn parse-tree [s]
   (-> s java-parse-tree parse))
   
+;;; Eclipse JDT API inheritance tree
 '{ASTNode
-  [{Expression [{Annotation [MarkerAnnotation NormalAnnotation
-                             SingleMemberAnnotation]
+  [{Expression [{Annotation [MarkerAnnotation NormalAnnotation SingleMemberAnnotation]
                  Name [QualifiedName SimpleName]}
-                Assignment ArrayInitializer ArrayAccess
-                BooleanLiteral CastExpression CharacterLiteral
-                ClassInstanceCreation ConditionalExpression
-                FieldAccess InfixExpression InstanceOfExpression
-                MethodInvocation NullLiteral NumberLiteral
-                ParenthesizedExpression PostfixExpression
-                PrefixExpression StringLiteral SuperFieldAccess
-                SuperMethodInvocation ThisExpression VariableDeclarationExpression
-                TypeLiteral]
-    Statement [Block AssertStatement BreakStatement ConstructorInvocation
-               ContinueStatement DoStatement EmptyStatement EnhancedForStatement
-               ExpressionStatement ForStatement IfStatement LabeledStatement
-               ReturnStatement SuperConstructorInvocation SwitchCase SwitchStatement
-               SynchronizedStatement ThrowStatement TryStatement
-               TypeDeclarationStatement VariableDeclarationStatement
-               WhileStatement]
-    Type [ArrayType ParameterizedType PrimitiveType QualifiedType SimpleType
-          UnionType WildcardType]
+                Assignment ArrayInitializer ArrayAccess BooleanLiteral CastExpression CharacterLiteral ClassInstanceCreation ConditionalExpression FieldAccess
+                InfixExpression InstanceOfExpression MethodInvocation NullLiteral NumberLiteral ParenthesizedExpression PostfixExpression PrefixExpression
+                StringLiteral SuperFieldAccess SuperMethodInvocation ThisExpression VariableDeclarationExpression TypeLiteral]
+    Statement [Block AssertStatement BreakStatement ConstructorInvocation ContinueStatement DoStatement EmptyStatement EnhancedForStatement ExpressionStatement
+               ForStatement IfStatement LabeledStatement ReturnStatement SuperConstructorInvocation SwitchCase SwitchStatement SynchronizedStatement ThrowStatement
+               TryStatement TypeDeclarationStatement VariableDeclarationStatement WhileStatement]
+    Type [ArrayType ParameterizedType PrimitiveType QualifiedType SimpleType UnionType WildcardType]
     Comment [BlockComment JavaDoc LineComment]
-    BodyDeclaration [{AbstractTypeDeclaration [AnnotationTypeDeclaration
-                                               EnumDeclaration
-                                               TypeDeclaration]}
-                     AnnotationTypeMemberDeclaration
-                     EnumConstantDeclaration
-                     FieldDeclaration
-                     MethodDeclaration
-                     Initializer]
+    BodyDeclaration [{AbstractTypeDeclaration [AnnotationTypeDeclaration EnumDeclaration TypeDeclaration]}
+                     AnnotationTypeMemberDeclaration EnumConstantDeclaration FieldDeclaration MethodDeclaration Initializer]
     VariableDeclaration [SingleVariableDeclaration VariableDeclarationFragment]}
-   PackageDeclaration
-   AnonymousClassDeclaration
-   CatchClause
-   CompilationUnit
-   ImportDeclaration
-   MemberRef
-   MemberValuePair
-   MethodRef
-   MethodRefParameter
-   PackageDeclaration
-   TagElement
-   TextElement
-   TypeParameter]}
-    
-    
+   PackageDeclaration AnonymousClassDeclaration CatchClause CompilationUnit ImportDeclaration MemberRef MemberValuePair MethodRef MethodRefParameter PackageDeclaration
+   TagElement TextElement TypeParameter]}
