@@ -136,7 +136,7 @@
 (defn impl [] (JavaAnalyzer.))
 
 (comment
-  (def uri "datomic:free://localhost:4334/git")
+  (def uri "datomic:free://localhost:4334/clojure")
   (def conn (d/connect uri))
   (def db (d/db conn))
   
@@ -151,6 +151,16 @@
            [?node :node/filename ?filename]
            [?filename :file/name ?fname]]
          db)))
+
+  ;; Find methods by class
+  (d/q '[:find ?mname
+         :where
+         [?c :code/name "clojure.lang.RT"]
+         [?cq :java/class ?c]
+         [?cq2 :codeq/parent ?cq]
+         [?cq2 :java/method ?c2]
+         [?c2 :code/name ?mname]]
+       db)
 
   (d/delete-database uri)
 

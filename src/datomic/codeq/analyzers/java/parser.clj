@@ -61,19 +61,21 @@
    :name (name node)})
 
 (defmethod parse* MethodDeclaration [node]
-  {:node :method-declaration
-   :name (name node)
-   :body (parse (.getBody node))
-   :parameters (map parse (.parameters node))
-   :return-type (parse (.getReturnType2 node))
-   :constructor? (.isConstructor node)
-   :varargs? (.isVarargs node)})
+  (merge
+   {:node :method-declaration
+    :name (name node)
+    :parameters (map parse (.parameters node))
+    :constructor? (.isConstructor node)
+    :varargs? (.isVarargs node)}
+   (when-let [body (.getBody node)]
+     {:body (parse body)})
+   (when-let [ret-type (.getReturnType2 node)]
+     {:return-type (parse ret-type)})))
+
 
 (defmethod parse* SingleVariableDeclaration [node]
   {:node :variable-declaration
-   :name (name node)
-   :type (parse (.getType node))
-   })
+   :name (name node)})
 
 (defmethod parse* Statement [node]
   {:node :statement})
