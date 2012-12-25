@@ -45,8 +45,10 @@
                   :code/name codename})
 
         codeqtx (assoc codeqtx
-                  (if interface? :java/interface :java/class)
-                  nameid)
+                  :java/class nameid
+                  :java/interface? interface?
+                  :java/package-name package
+                  :java/class-name name)
 
         methodtxs (mapcat #(tx-data db fid % (assoc ctx :typename codename :parent codeqid)) methods)]
     
@@ -90,7 +92,9 @@
         nametx (if (util/tempid? nameid)
                  {:db/id nameid
                   :code/name codename})
-        codeqtx (assoc codeqtx :java/method nameid)]
+        codeqtx (assoc codeqtx
+                  :java/method nameid
+                  :java/method-name name)]
     (remove nil? [codetx codeqtx nametx])))
 
 (defn analyze [db fid src]
@@ -111,18 +115,42 @@
        :db/cardinality :db.cardinality/one
        :db/doc "codename defined by a class definition"
        :db.install/_attribute :db.part/db}
-      {:db/id #db/id[:db.part/db]
-       :db/ident :java/interface
-       :db/valueType :db.type/ref
-       :db/cardinality :db.cardinality/one
-       :db/doc "codename defined by an interface definition"
-       :db.install/_attribute :db.part/db}
+
       {:db/id #db/id[:db.part/db]
        :db/ident :java/method
        :db/valueType :db.type/ref
        :db/cardinality :db.cardinality/one
        :db/doc "Java method"
-       :db.install/_attribute :db.part/db}]})
+       :db.install/_attribute :db.part/db}
+
+      {:db/id #db/id[:db.part/db]
+       :db/ident :java/package-name
+       :db/valueType :db.type/string
+       :db/cardinality :db.cardinality/one
+       :db/doc ""
+       :db.install/_attribute :db.part/db}
+
+      {:db/id #db/id[:db.part/db]
+       :db/ident :java/class-name
+       :db/valueType :db.type/string
+       :db/cardinality :db.cardinality/one
+       :db/doc ""
+       :db.install/_attribute :db.part/db}
+
+      {:db/id #db/id[:db.part/db]
+       :db/ident :java/interface?
+       :db/valueType :db.type/boolean
+       :db/cardinality :db.cardinality/one
+       :db/doc ""
+       :db.install/_attribute :db.part/db}
+
+      {:db/id #db/id[:db.part/db]
+       :db/ident :java/method-name
+       :db/valueType :db.type/string
+       :db/cardinality :db.cardinality/one
+       :db/doc ""
+       :db.install/_attribute :db.part/db}
+      ]})
 
 
 (deftype JavaAnalyzer []
@@ -134,34 +162,3 @@
   (analyze [a db fid src] (analyze db fid src)))
 
 (defn impl [] (JavaAnalyzer.))
-
-(comment
-  (def uri "datomic:free://localhost:4334/clojure")
-  (def conn (d/connect uri))
-  (def db (d/db conn))
-  
-  (clojure.pprint/pprint
-   (sort
-    (d/q '[:find ?fname ?n ; ?commit
-           :where
-           [?cq :java/class ?c]
-           [?c :code/name ?n]
-           [?cq :codeq/file ?f]
-           [?node :node/object ?f]
-           [?node :node/filename ?filename]
-           [?filename :file/name ?fname]]
-         db)))
-
-  ;; Find methods by class
-  (d/q '[:find ?mname
-         :where
-         [?c :code/name "clojure.lang.RT"]
-         [?cq :java/class ?c]
-         [?cq2 :codeq/parent ?cq]
-         [?cq2 :java/method ?c2]
-         [?c2 :code/name ?mname]]
-       db)
-
-  (d/delete-database uri)
-
-  )
