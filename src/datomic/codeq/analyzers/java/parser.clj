@@ -1,8 +1,10 @@
 (ns datomic.codeq.analyzers.java.parser
   (:refer-clojure :exclude [name])
   (:require [datomic.codeq.analyzer :as az]
+            [clojure.string :as str]
             [clojure.java.io :as io])
-  (:import [org.eclipse.jdt.core.dom AST ASTParser
+  (:import [org.eclipse.jdt.core.dom AST ASTNode ASTParser
+            ArrayType ParameterizedType PrimitiveType SimpleType
             CompilationUnit PackageDeclaration ImportDeclaration
             TypeDeclaration EnumDeclaration AnnotationTypeDeclaration
             MethodDeclaration Statement Expression Type SingleVariableDeclaration]
@@ -24,8 +26,52 @@
      (.getLineNumber root epos)
      (.getColumnNumber root epos)]))
 
-(defn name [node]
-  (-> node .getName .getFullyQualifiedName))
+(defprotocol UniqueName
+  (name [_]))
+
+(defprotocol ArgName
+  (argname [_]))
+
+(extend-protocol ArgName
+  ArrayType
+  (argname
+   [node]
+   (str "[" (argname (.getComponentType node))))
+
+  ParameterizedType
+  (argname
+   [node]
+   (str (argname (.getType node))))
+  
+  SimpleType
+  (argname
+   [node]
+   (str "L" (.getName node) ";"))
+  
+  PrimitiveType
+  (argname
+   [node]
+   (str (.getPrimitiveTypeCode node)))
+  
+  SingleVariableDeclaration
+  (argname
+   [node]
+   (argname (.getType node))))
+
+(extend-protocol UniqueName
+  MethodDeclaration
+  (name
+   [node]
+   (str (-> node .getName .getFullyQualifiedName)
+        "("
+        (str/join ""
+                  (map argname (.parameters node)))
+        ")"))
+  
+  ASTNode
+  (name
+   [node]
+   (-> node .getName .getFullyQualifiedName)))
 
 (defmulti parse* type)
 
