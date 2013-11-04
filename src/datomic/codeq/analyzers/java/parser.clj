@@ -10,17 +10,19 @@
             MethodDeclaration Statement Expression Type SingleVariableDeclaration]
            [org.eclipse.jdt.core JavaCore]))
 
-(defn java-parse-tree [s]
+(set! *warn-on-reflection* true)
+
+(defn java-parse-tree [^String s]
   (let [parser (ASTParser/newParser AST/JLS3)
         options (JavaCore/getOptions)]
     (.setSource parser (.toCharArray s))
     (.setCompilerOptions parser options)
     (.createAST parser nil)))
   
-(defn loc [node]
+(defn loc [^ASTNode node]
   (let [spos (.getStartPosition node)
         epos (dec (+ spos (.getLength node)))
-        root (.getRoot node)]
+        root ^CompilationUnit (.getRoot node)]
     [(.getLineNumber root spos)
      (.getColumnNumber root spos)
      (.getLineNumber root epos)
@@ -59,6 +61,10 @@
    (argname (.getType node))))
 
 (extend-protocol UniqueName
+  nil       ;; see this importing junit, have not tracked down
+  (name
+   [_] nil)
+  
   MethodDeclaration
   (name
    [node]
@@ -82,13 +88,13 @@
             :sha (az/sha src)}
            (parse* node))))
 
-(defmethod parse* CompilationUnit [node]
+(defmethod parse* CompilationUnit [^CompilationUnit node]
   {:node :compilation-unit
    :package (name (.getPackage node))
    :imports (map name (.imports node))
    :types (map parse (.types node))})
 
-(defmethod parse* TypeDeclaration [node]
+(defmethod parse* TypeDeclaration [^TypeDeclaration node]
   (merge {:node :type-declaration
           :name (name node)
           :fields (map parse (.getFields node))
@@ -106,7 +112,7 @@
   {:node :annotation-type-declaration
    :name (name node)})
 
-(defmethod parse* MethodDeclaration [node]
+(defmethod parse* MethodDeclaration [^MethodDeclaration node]
   (merge
    {:node :method-declaration
     :name (name node)
