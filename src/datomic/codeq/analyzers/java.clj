@@ -67,10 +67,9 @@
    {:keys [name parameters loc sha src] :as ast}
    {:keys [sha->id codename->id loc->codeqid typename parent] :as ctx}]
   (let [loc-str (apply pr-str loc)
-        codename (format "%s/%s/%s"
+        codename (format "%s/%s"
                          typename
-                         name
-                         (count parameters))
+                         name)
 
         codeid (sha->id sha)
 
