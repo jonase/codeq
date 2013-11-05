@@ -41,18 +41,18 @@ You can import more than one repo into the same db. You can re-import later afte
 You can then (or during) connect to the same db URI with a peer. Or, just start the [Datomic REST service](http://docs.datomic.com/rest.html) and poke around:
 
     cd whereverYouPutDatomicFree
-    bin/rest 8080 free datomic:free://localhost:4334/
+    bin/rest -p 8080 free datomic:free://localhost:4334/
 
-Browse to [localhost:8080](http://localhost:8080). You should see the `free` storage and the `git` db within it.
+Browse to [localhost:8080/data/](http://localhost:8080/data/). You should see the `free` storage and the `git` db within it.
 
 The [schema diagram](https://github.com/downloads/Datomic/codeq/codeq.pdf) will help you get oriented.
 
 ## More info
 
 See the [intro blog post](http://blog.datomic.com/2012/10/codeq.html) and the [wiki](https://github.com/Datomic/codeq/wiki)
- 
+
 ## License
 
-Copyright © 2012 Metadata Partners, LLC
+Copyright © 2012 Metadata Partners, LLC and Contributors. All rights reserved.
 
 Distributed under the Eclipse Public License, the same as Clojure.

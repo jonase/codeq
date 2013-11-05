@@ -1,4 +1,4 @@
-;;   Copyright (c) Metadata Partners, LLC. All rights reserved.
+;;   Copyright (c) Metadata Partners, LLC and Contributors. All rights reserved.
 ;;   The use and distribution terms for this software are covered by the
 ;;   Eclipse Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php)
 ;;   which can be found in the file epl-v10.html at the root of this distribution.
@@ -38,9 +38,9 @@
     (-> sb str .trim)))
 
 (defn loc
-  "Returns zero-based [line col endline endcol] given one-based 
-  \"line col endline endcol\" string" 
-  [loc-string] 
+  "Returns zero-based [line col endline endcol] given one-based
+  \"line col endline endcol\" string"
+  [loc-string]
   (mapv dec (read-string (str "[" loc-string "]"))))
 
 (defn line-offsets
@@ -50,19 +50,19 @@
    index is the length of the string."
   [^String s]
   (let [nl (long \newline)]
-    (persistent! 
+    (persistent!
      (loop [ret (transient [0]), i 0]
-       (if (= i (.length s)) 
+       (if (= i (.length s))
          ret
-         (recur (if (= (.codePointAt s i) nl) 
-                  (conj! ret (inc i)) 
-                  ret) 
+         (recur (if (= (.codePointAt s i) nl)
+                  (conj! ret (inc i))
+                  ret)
                 (inc i)))))))
 
 (defn segment
   "Given a string and line offsets, returns text from (zero-based)
-  line and col to endline/endcol (exclusive)" 
+  line and col to endline/endcol (exclusive)"
   [^String s line-offsets line col endline endcol]
-  (subs s 
+  (subs s
         (+ (nth line-offsets line) col)
         (+ (nth line-offsets endline) endcol)))
