@@ -1,0 +1,41 @@
+#!/bin/bash
+
+cd `dirname $0`/..
+CODEQ_VERSION="0.1.0-SNAPSHOT"
+CODEQ_ROOT=`pwd`
+
+DATOMIC_VERSION="0.8.4254"
+DATOMIC_FILE="datomic-free-$DATOMIC_VERSION"
+DATOMIC_URL=http://downloads.datomic.com/$DATOMIC_VERSION/$DATOMIC_FILE.zip
+
+DB_URI="datomic:free://localhost:4334/storm"
+
+WORKING_DIR=tmp/examples/storm
+mkdir -p $WORKING_DIR
+cd $WORKING_DIR
+WORKING_DIR=`pwd`
+
+if [ ! -d "$DATOMIC_FILE" ]; then
+  wget $DATOMIC_URL
+  unzip $DATOMIC_FILE.zip
+fi
+cd $DATOMIC_FILE
+bin/transactor config/samples/free-transactor-template.properties &
+TRANSACTOR_PID=$!
+
+cd $CODEQ_ROOT
+
+lein clean
+lein uberjar
+
+git clone https://github.com/nathanmarz/storm.git $WORKING_DIR/storm
+cd $WORKING_DIR/storm
+
+java -server -Xmx1g -jar $CODEQ_ROOT/target/codeq-$CODEQ_VERSION-standalone.jar $DB_URI
+
+cd $CODEQ_ROOT
+lein run -m datomic.codeq.examples.storm $DB_URI
+
+pkill -P $TRANSACTOR_PID
+
+exit $RET
